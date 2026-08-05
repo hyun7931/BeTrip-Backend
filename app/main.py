@@ -1,9 +1,9 @@
-from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
+from fastapi import FastAPI
+
+from app.api.v1.router import api_router as v1_router
 from app.core.config import settings
-from app.db.session import engine
-from app.api.v1 import router as v1_router
 
 
 @asynccontextmanager
@@ -18,6 +18,7 @@ app = FastAPI(
 )
 
 app.include_router(v1_router, prefix="/api/v1")
+
 
 @app.get("/health")
 async def health_check():
