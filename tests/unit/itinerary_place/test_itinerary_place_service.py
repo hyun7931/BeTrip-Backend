@@ -1,9 +1,3 @@
-"""ItineraryPlaceService 유닛테스트.
-
-repository는 AsyncMock으로 대체해서 DB 없이 서비스의 비즈니스 로직만 검증한다.
-(일정/장소 없음 -> 404, 중복 담기 -> 409, 정상 흐름)
-"""
-
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
