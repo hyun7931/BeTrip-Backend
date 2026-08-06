@@ -41,6 +41,12 @@ class ItineraryRepository:
         )
         return [(row[0], row[1]) for row in result.all()]
 
+    async def create(self, itinerary: Itinerary) -> Itinerary:
+        self.db.add(itinerary)
+        await self.db.commit()
+        await self.db.refresh(itinerary)
+        return itinerary
+
     async def delete(self, itinerary: Itinerary) -> None:
         await self.db.delete(itinerary)
         await self.db.commit()

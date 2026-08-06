@@ -1,9 +1,69 @@
 import uuid
+from datetime import date, datetime, timezone
 
 import pytest
 from fastapi import HTTPException
 
+from app.schemas.itinerary import ItineraryConditionsRequest
 from app.services.itinerary_service import ItineraryService
+
+
+def _fake_saved(itinerary):
+    """실제 repo.create()가 DB insert 후 채워주는 필드(PK/생성시각)를 흉내낸다."""
+    itinerary.itinerary_id = uuid.uuid4()
+    itinerary.created_at = datetime.now(timezone.utc)
+    return itinerary
+
+
+class TestCreateItinerary:
+    async def test_create_success_maps_request_and_returns_draft(
+        self, mock_itinerary_repo, sample_user_id
+    ):
+        mock_itinerary_repo.create.side_effect = _fake_saved
+
+        service = ItineraryService(mock_itinerary_repo)
+        req = ItineraryConditionsRequest(
+            start_date=date(2026, 8, 10),
+            end_date=date(2026, 8, 13),
+            region="제주도",
+            arrival_time="LUNCH",
+            departure_time="MORNING",
+            transportation="CAR",
+            purpose="FAMILY",
+            styles=["NATURE", "FOOD"],
+        )
+
+        result = await service.create_itinerary(sample_user_id, req)
+
+        assert result.status == "DRAFT"
+        mock_itinerary_repo.create.assert_awaited_once()
+        created_itinerary = mock_itinerary_repo.create.await_args.args[0]
+        assert created_itinerary.user_id == sample_user_id
+        assert created_itinerary.region == "제주도"
+        assert created_itinerary.transportation == "CAR"
+        assert created_itinerary.purpose == "FAMILY"
+        assert created_itinerary.styles == ["NATURE", "FOOD"]
+
+    async def test_create_success_with_optional_fields_omitted(
+        self, mock_itinerary_repo, sample_user_id
+    ):
+        mock_itinerary_repo.create.side_effect = _fake_saved
+
+        service = ItineraryService(mock_itinerary_repo)
+        req = ItineraryConditionsRequest(
+            start_date=date(2026, 8, 10),
+            end_date=date(2026, 8, 13),
+            region="제주도",
+            arrival_time="LUNCH",
+            departure_time="MORNING",
+        )
+
+        await service.create_itinerary(sample_user_id, req)
+
+        created_itinerary = mock_itinerary_repo.create.await_args.args[0]
+        assert created_itinerary.transportation is None
+        assert created_itinerary.purpose is None
+        assert created_itinerary.styles == []
 
 
 class TestListItineraries:

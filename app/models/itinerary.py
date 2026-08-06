@@ -48,8 +48,8 @@ class Itinerary(Base):
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     arrival_time: Mapped[str] = mapped_column(String(10), nullable=False)
     departure_time: Mapped[str] = mapped_column(String(10), nullable=False)
-    transportation: Mapped[str] = mapped_column(String(20), nullable=False)
-    purpose: Mapped[str] = mapped_column(String(20), nullable=False)
+    transportation: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
     styles: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

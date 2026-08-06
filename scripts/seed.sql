@@ -37,6 +37,13 @@ VALUES
         '전주 당일치기', 'SAVED', '전주',
         '2026-09-01', '2026-09-01', 'MORNING', 'EVENING',
         'PUBLIC_TRANSPORT', 'FRIEND', '["FOOD"]'
+    ),
+    (
+        '55555555-5555-5555-5555-555555555555',
+        '11111111-1111-1111-1111-111111111111',
+        '부산 이동수단/목적 미정', 'DRAFT', '부산',
+        '2026-10-05', '2026-10-07', 'LUNCH', 'EVENING',
+        NULL, NULL, '[]'
     )
 ON CONFLICT (itinerary_id) DO NOTHING;
 

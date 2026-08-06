@@ -3,6 +3,146 @@ import uuid
 from tests.integration.itinerary.conftest import create_itinerary
 
 
+def _valid_conditions_payload(**overrides):
+    payload = {
+        "start_date": "2026-08-10",
+        "end_date": "2026-08-13",
+        "region": "제주도",
+        "arrival_time": "LUNCH",
+        "departure_time": "MORNING",
+    }
+    payload.update(overrides)
+    return payload
+
+
+class TestCreateItineraryAPI:
+    async def test_create_with_required_fields_only(self, client, signed_up_user):
+        access_token, _ = signed_up_user
+
+        response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=_valid_conditions_payload(),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["status"] == "DRAFT"
+        assert "itinerary_id" in data
+
+    async def test_create_with_all_fields(self, client, signed_up_user):
+        access_token, _ = signed_up_user
+
+        response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=_valid_conditions_payload(
+                transportation="CAR",
+                purpose="FAMILY",
+                styles=["NATURE", "FOOD"],
+            ),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 201
+
+    async def test_created_itinerary_is_visible_in_detail(self, client, signed_up_user):
+        access_token, _ = signed_up_user
+        headers = {"Authorization": f"Bearer {access_token}"}
+
+        create_response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=_valid_conditions_payload(
+                transportation="CAR", purpose="FAMILY", styles=["NATURE"]
+            ),
+            headers=headers,
+        )
+        itinerary_id = create_response.json()["itinerary_id"]
+
+        detail_response = await client.get(
+            f"/api/v1/itineraries/{itinerary_id}", headers=headers
+        )
+
+        assert detail_response.status_code == 200
+        conditions = detail_response.json()["conditions"]
+        assert conditions["region"] == "제주도"
+        assert conditions["transportation"] == "CAR"
+        assert conditions["styles"] == ["NATURE"]
+
+    async def test_missing_required_field_returns_422(self, client, signed_up_user):
+        access_token, _ = signed_up_user
+        payload = _valid_conditions_payload()
+        del payload["region"]
+
+        response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=payload,
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 422
+
+    async def test_end_date_before_start_date_returns_422(self, client, signed_up_user):
+        access_token, _ = signed_up_user
+
+        response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=_valid_conditions_payload(
+                start_date="2026-08-13", end_date="2026-08-10"
+            ),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 422
+
+    async def test_trip_longer_than_14_days_returns_422(self, client, signed_up_user):
+        access_token, _ = signed_up_user
+
+        response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=_valid_conditions_payload(
+                start_date="2026-08-01", end_date="2026-08-20"
+            ),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 422
+
+    async def test_same_day_arrival_after_departure_returns_422(
+        self, client, signed_up_user
+    ):
+        access_token, _ = signed_up_user
+
+        response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=_valid_conditions_payload(
+                start_date="2026-08-10",
+                end_date="2026-08-10",
+                arrival_time="EVENING",
+                departure_time="MORNING",
+            ),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 422
+
+    async def test_invalid_style_returns_422(self, client, signed_up_user):
+        access_token, _ = signed_up_user
+
+        response = await client.post(
+            "/api/v1/itineraries/conditions",
+            json=_valid_conditions_payload(styles=["UNKNOWN"]),
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+        assert response.status_code == 422
+
+    async def test_requires_authentication(self, client):
+        response = await client.post(
+            "/api/v1/itineraries/conditions", json=_valid_conditions_payload()
+        )
+        assert response.status_code == 401
+
+
 class TestListItinerariesAPI:
     async def test_returns_empty_list_when_none(self, client, signed_up_user):
         access_token, _ = signed_up_user

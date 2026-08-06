@@ -5,7 +5,9 @@ from fastapi import HTTPException, status
 from app.models.itinerary import Itinerary
 from app.repositories.itinerary_repository import ItineraryRepository
 from app.schemas.itinerary import (
+    ItineraryConditionsRequest,
     ItineraryConditionsResponse,
+    ItineraryCreateResponse,
     ItineraryDetailResponse,
     ItineraryPlaceResponse,
     ItinerarySummaryResponse,
@@ -16,6 +18,28 @@ from app.utils.region_thumbnail import get_region_thumbnail
 class ItineraryService:
     def __init__(self, repo: ItineraryRepository):
         self.repo = repo
+
+    async def create_itinerary(
+        self, user_id: UUID, req: ItineraryConditionsRequest
+    ) -> ItineraryCreateResponse:
+        itinerary = Itinerary(
+            user_id=user_id,
+            status="DRAFT",
+            region=req.region,
+            start_date=req.start_date,
+            end_date=req.end_date,
+            arrival_time=req.arrival_time,
+            departure_time=req.departure_time,
+            transportation=req.transportation,
+            purpose=req.purpose,
+            styles=req.styles,
+        )
+        created = await self.repo.create(itinerary)
+        return ItineraryCreateResponse(
+            itinerary_id=created.itinerary_id,
+            status=created.status,
+            created_at=created.created_at,
+        )
 
     async def list_itineraries(self, user_id: UUID) -> list[ItinerarySummaryResponse]:
         itineraries = await self.repo.find_all_by_user(user_id)
