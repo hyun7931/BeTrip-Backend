@@ -19,5 +19,8 @@ class Settings(BaseSettings):
     # --- API ---
     API_V1_PREFIX: str = "/api/v1"
 
+    # --- KAKAO ---
+    KAKAO_REST_API_KEY: str
+
 
 settings = Settings()
