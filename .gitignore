@@ -38,3 +38,10 @@ htmlcov/
 
 # Alembic
 alembic/versions/*.pyc
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+docs/*
