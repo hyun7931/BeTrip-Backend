@@ -1,51 +1,18 @@
-from sqlalchemy import (
-    TIMESTAMP,
-    CheckConstraint,
-    Column,
-    Date,
-    ForeignKey,
-    Index,
-    String,
-    func,
-    text,
-)
+import uuid
+from datetime import date, datetime
+
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
 
 class Itinerary(Base):
-    """DDL: itineraries 테이블과 1:1 매칭"""
-
     __tablename__ = "itineraries"
-
-    itinerary_id = Column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        server_default=text("gen_random_uuid()"),
-    )
-    user_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("users.user_id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    title = Column(String(100))
-    status = Column(String(20), nullable=False, server_default="DRAFT")
-    region = Column(String(50), nullable=False)
-    start_date = Column(Date, nullable=False)
-    end_date = Column(Date, nullable=False)
-    arrival_time = Column(String(10), nullable=False)
-    departure_time = Column(String(10), nullable=False)
-    transportation = Column(String(20), nullable=False)
-    purpose = Column(String(20), nullable=False)
-    styles = Column(JSONB, nullable=False, server_default="[]")
-    created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
-    updated_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
-
     __table_args__ = (
         CheckConstraint(
-            "status IN ('DRAFT', 'GENERATED', 'SAVED')",
-            name="chk_itineraries_status",
+            "status IN ('DRAFT', 'GENERATED', 'SAVED')", name="chk_itineraries_status"
         ),
         CheckConstraint(
             "arrival_time IN ('MORNING', 'LUNCH', 'EVENING')",
@@ -63,9 +30,30 @@ class Itinerary(Base):
             "purpose IN ('FRIEND', 'FAMILY', 'COUPLE', 'PET', 'PARENTS')",
             name="chk_itineraries_purpose",
         ),
-        CheckConstraint(
-            "end_date >= start_date",
-            name="chk_itineraries_dates",
-        ),
-        Index("idx_itineraries_user_updated", "user_id", updated_at.desc()),
+        CheckConstraint("end_date >= start_date", name="chk_itineraries_dates"),
+    )
+
+    itinerary_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    title: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="DRAFT")
+    region: Mapped[str] = mapped_column(String(50), nullable=False)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    arrival_time: Mapped[str] = mapped_column(String(10), nullable=False)
+    departure_time: Mapped[str] = mapped_column(String(10), nullable=False)
+    transportation: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    purpose: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    styles: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
