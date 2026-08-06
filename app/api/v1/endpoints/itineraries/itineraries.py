@@ -17,7 +17,7 @@ router = APIRouter(prefix="/itineraries", tags=["itineraries"])
 
 
 @router.post(
-    "",
+    "/conditions",
     response_model=ItineraryCreateResponse,
     status_code=status.HTTP_201_CREATED,
     summary="여행 조건 입력 → 일정 생성",

@@ -20,7 +20,7 @@ class TestCreateItineraryAPI:
         access_token, _ = signed_up_user
 
         response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=_valid_conditions_payload(),
             headers={"Authorization": f"Bearer {access_token}"},
         )
@@ -34,7 +34,7 @@ class TestCreateItineraryAPI:
         access_token, _ = signed_up_user
 
         response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=_valid_conditions_payload(
                 transportation="CAR",
                 purpose="FAMILY",
@@ -50,7 +50,7 @@ class TestCreateItineraryAPI:
         headers = {"Authorization": f"Bearer {access_token}"}
 
         create_response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=_valid_conditions_payload(
                 transportation="CAR", purpose="FAMILY", styles=["NATURE"]
             ),
@@ -74,7 +74,7 @@ class TestCreateItineraryAPI:
         del payload["region"]
 
         response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=payload,
             headers={"Authorization": f"Bearer {access_token}"},
         )
@@ -85,7 +85,7 @@ class TestCreateItineraryAPI:
         access_token, _ = signed_up_user
 
         response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=_valid_conditions_payload(
                 start_date="2026-08-13", end_date="2026-08-10"
             ),
@@ -98,7 +98,7 @@ class TestCreateItineraryAPI:
         access_token, _ = signed_up_user
 
         response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=_valid_conditions_payload(
                 start_date="2026-08-01", end_date="2026-08-20"
             ),
@@ -113,7 +113,7 @@ class TestCreateItineraryAPI:
         access_token, _ = signed_up_user
 
         response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=_valid_conditions_payload(
                 start_date="2026-08-10",
                 end_date="2026-08-10",
@@ -129,7 +129,7 @@ class TestCreateItineraryAPI:
         access_token, _ = signed_up_user
 
         response = await client.post(
-            "/api/v1/itineraries",
+            "/api/v1/itineraries/conditions",
             json=_valid_conditions_payload(styles=["UNKNOWN"]),
             headers={"Authorization": f"Bearer {access_token}"},
         )
@@ -138,7 +138,7 @@ class TestCreateItineraryAPI:
 
     async def test_requires_authentication(self, client):
         response = await client.post(
-            "/api/v1/itineraries", json=_valid_conditions_payload()
+            "/api/v1/itineraries/conditions", json=_valid_conditions_payload()
         )
         assert response.status_code == 401
 
