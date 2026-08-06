@@ -1,10 +1,9 @@
 import httpx
-from core.config import get_settings
 from fastapi import HTTPException, status
-from schemas.place import KakaoPlaceRaw
-from utils.category_mapper import map_kakao_category
 
-settings = get_settings()
+from app.core.config import settings
+from app.schemas.place import KakaoPlaceRaw
+from app.utils.category_mapper import map_kakao_category
 
 KEYWORD_SEARCH_URL = "https://dapi.kakao.com/v2/local/search/keyword.json"
 
@@ -18,7 +17,7 @@ class KakaoMapClient:
     """
 
     def __init__(self):
-        self._headers = {"Authorization": f"KakaoAK {settings.kakao_rest_api_key}"}
+        self._headers = {"Authorization": f"KakaoAK {settings.KAKAO_REST_API_KEY}"}
 
     async def search_by_keyword(
         self, query: str, page: int = 1, size: int = 15
