@@ -47,12 +47,20 @@ VALUES
     )
 ON CONFLICT (itinerary_id) DO NOTHING;
 
--- 3. 테스트 장소 + 담긴 장소 1건 (상세조회 응답의 places 배열이 채워지는 것까지 확인용)
+-- 3. 테스트 장소 2건 + 담긴 장소 1건
+--    kakao-12345/kakao-67890 두 곳은 검색(GET /map/search) 없이도 바로
+--    GET /map/transit?from=kakao-12345&to=kakao-67890&mode=CAR(또는 WALK) 테스트가 가능하도록 실좌표로 넣어둠
+--    (GET /map/places/{place_id}는 kakao-12345로, GET /map/search는 실제 카카오 API를 호출하니 시드 불필요)
 INSERT INTO places (place_id, name, category, address, lat, lng, place_url)
-VALUES (
-    'kakao-12345', '협재해수욕장', 'ACTIVITY', '제주시 한림읍',
-    33.3938, 126.2397, 'https://place.map.kakao.com/12345'
-)
+VALUES
+    (
+        'kakao-12345', '협재해수욕장', 'ACTIVITY', '제주시 한림읍',
+        33.3938, 126.2397, 'https://place.map.kakao.com/12345'
+    ),
+    (
+        'kakao-67890', '제주국제공항', 'ACTIVITY', '제주시 용담2동',
+        33.5066, 126.4930, 'https://place.map.kakao.com/67890'
+    )
 ON CONFLICT (place_id) DO NOTHING;
 
 INSERT INTO itinerary_places (itinerary_place_id, itinerary_id, place_id, day, time_slot, order_in_day)

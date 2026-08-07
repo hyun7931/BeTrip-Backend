@@ -24,5 +24,29 @@ class PlaceDetailResponse(BaseModel):
     thumbnail_url: str | None = Field(default=None, alias="thumbnailUrl")
 
 
-# 검색 관련 스키마(PlaceSearchResponse, KakaoPlaceRaw 등)는
-# /map/places/search 담당자가 자신의 구현에 맞게 이 파일에 추가하면 됨.
+class KakaoPlaceRaw(BaseModel):
+    """카카오 로컬 API(키워드/카테고리 검색) 원시 응답을 파싱한 결과."""
+
+    place_id: str
+    name: str
+    category: PlaceCategory
+    address: str | None = None
+    lat: float
+    lng: float
+    place_url: str
+
+
+class PlaceSearchResult(BaseModel):
+    """GET /map/search 응답 아이템. snake_case로만 작성 (docs/api-spec.md 원칙)."""
+
+    place_id: str
+    name: str
+    category: PlaceCategory
+    address: str | None = None
+    lat: float
+    lng: float
+    thumbnail_url: str | None = None
+
+
+class PlaceSearchResponse(BaseModel):
+    places: list[PlaceSearchResult]
