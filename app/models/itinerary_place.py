@@ -33,9 +33,7 @@ class ItineraryPlace(Base):
             name="chk_itinerary_places_time_slot",
         ),
         CheckConstraint("day >= 1", name="chk_itinerary_places_day"),
-        UniqueConstraint(
-            "itinerary_id", "place_id", name="uq_itinerary_places_place"
-        ),
+        UniqueConstraint("itinerary_id", "place_id", name="uq_itinerary_places_place"),
         Index(
             "idx_itinerary_places_order",
             "itinerary_id",
@@ -63,9 +61,7 @@ class ItineraryPlace(Base):
     time_slot: Mapped[str | None] = mapped_column(String(10), nullable=True)
     order_in_day: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     start_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
-    travel_time_to_next_min: Mapped[int | None] = mapped_column(
-        Integer, nullable=True
-    )
+    travel_time_to_next_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     added_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
