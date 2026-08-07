@@ -118,3 +118,15 @@ class ItineraryDetailResponse(BaseModel):
     places: list[ItineraryPlaceResponse]
     schedule: ScheduleResponse | None
     updated_at: datetime
+
+
+class PlanGenerateResponse(BaseModel):
+    itinerary_id: UUID
+    status: ItineraryStatus
+    schedule: ScheduleResponse | None
+
+
+class PlanSaveResponse(BaseModel):
+    itinerary_id: UUID
+    status: ItineraryStatus
+    saved_at: datetime
