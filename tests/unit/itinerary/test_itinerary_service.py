@@ -43,6 +43,7 @@ class TestCreateItinerary:
         assert created_itinerary.transportation == "CAR"
         assert created_itinerary.purpose == "FAMILY"
         assert created_itinerary.styles == ["NATURE", "FOOD"]
+        assert created_itinerary.title == "제주도 3박4일"
 
     async def test_create_success_with_optional_fields_omitted(
         self, mock_itinerary_repo, sample_user_id

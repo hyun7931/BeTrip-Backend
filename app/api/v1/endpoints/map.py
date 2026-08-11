@@ -23,7 +23,6 @@ def get_transit_service(db: AsyncSession = Depends(get_db)) -> TransitService:
 @router.get(
     "/places/{place_id}",
     response_model=PlaceDetailResponse,
-    response_model_by_alias=True,
     summary="Get Place Detail",
 )
 async def get_place_detail(

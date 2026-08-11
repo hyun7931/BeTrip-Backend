@@ -19,6 +19,7 @@ from app.schemas.itinerary import (
     ScheduleItemResponse,
     ScheduleResponse,
 )
+from app.utils.itinerary_title import generate_itinerary_title
 from app.utils.region_thumbnail import get_region_thumbnail
 
 
@@ -31,6 +32,7 @@ class ItineraryService:
     ) -> ItineraryCreateResponse:
         itinerary = Itinerary(
             user_id=user_id,
+            title=generate_itinerary_title(req.region, req.start_date, req.end_date),
             status="DRAFT",
             region=req.region,
             start_date=req.start_date,
