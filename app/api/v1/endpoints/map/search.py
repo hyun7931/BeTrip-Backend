@@ -10,7 +10,7 @@ router = APIRouter()
 @router.get(
     "/search",
     response_model=PlaceSearchResponse,
-    summary="지도 검색",
+    summary="Search Places",
     description=(
         "**q 또는 category 중 하나는 반드시 있어야 함** — 둘 다 없으면 422.\n\n"
         "- `q`만 사용: 키워드 검색. 위치(x/y/radius, rect)는 선택 — "

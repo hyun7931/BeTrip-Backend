@@ -14,7 +14,7 @@ router = APIRouter(prefix="/itineraries/{itinerary_id}/plans", tags=["itinerary_
 @router.post(
     "/generate",
     response_model=PlanGenerateResponse,
-    summary="자동 일정 생성",
+    summary="Generate Itinerary Plan",
 )
 async def generate_plan(
     itinerary_id: UUID,
@@ -27,7 +27,7 @@ async def generate_plan(
 @router.post(
     "/save",
     response_model=PlanSaveResponse,
-    summary="일정 저장 확정",
+    summary="Save Itinerary Plan",
 )
 async def save_plan(
     itinerary_id: UUID,

@@ -11,7 +11,7 @@ router = APIRouter()
     "/places/{place_id}",
     response_model=PlaceDetailResponse,
     response_model_by_alias=True,
-    summary="장소 상세 조회",
+    summary="Get Place Detail",
 )
 async def get_place_detail(
     place_id: str,
