@@ -74,6 +74,7 @@ class ItineraryService:
 
         places = [
             ItineraryPlaceResponse(
+                itinerary_place_id=itinerary_place.itinerary_place_id,
                 place_id=place.place_id,
                 name=place.name,
                 category=place.category,

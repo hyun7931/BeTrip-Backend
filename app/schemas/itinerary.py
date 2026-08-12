@@ -82,6 +82,7 @@ class ItineraryConditionsResponse(BaseModel):
 
 
 class ItineraryPlaceResponse(BaseModel):
+    itinerary_place_id: UUID
     place_id: str
     name: str
     category: PlaceCategory
