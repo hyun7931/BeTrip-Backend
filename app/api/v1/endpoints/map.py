@@ -66,9 +66,16 @@ async def search_places(
 ):
     result = await service.search_places(q, x, y, radius, rect, category)
     # 개발용
-    # fetch/upsert 단계별 소요시간을 바로 볼 수 있게 표준 Server-Timing 헤더로 노출
+    # fetch/upsert 단계별 소요시간을 바로 볼 수 있게 표준 Server-Timing 헤더로 노출.
+    # og_fetch에 캐시 fit/miss도 노출
     if service.last_timing:
-        response.headers["Server-Timing"] = format_server_timing(service.last_timing)
+        descriptions = {}
+        if service.last_cache_stats:
+            stats = service.last_cache_stats
+            descriptions["og_fetch"] = f"hit={stats['hit']} miss={stats['miss']}"
+        response.headers["Server-Timing"] = format_server_timing(
+            service.last_timing, descriptions
+        )
     return result
 
 
