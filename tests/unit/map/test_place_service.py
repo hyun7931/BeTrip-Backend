@@ -81,3 +81,43 @@ async def test_search_places_without_q_or_category_raises_422(
         )
 
     assert exc_info.value.status_code == 422
+
+
+async def test_search_places_skips_og_fetch_for_already_cached_place(
+    mock_place_repo,
+    mock_kakao_client,
+    sample_place,
+    sample_kakao_place_raw,
+    monkeypatch,
+):
+    mock_kakao_client.search_by_keyword.return_value = [sample_kakao_place_raw]
+    mock_place_repo.get_by_ids.return_value = [sample_place]  # thumbnail_url 캐시됨
+    fetch_mock = AsyncMock()
+    monkeypatch.setattr("app.services.place_service.fetch_og_image", fetch_mock)
+
+    service = PlaceService(mock_place_repo, mock_kakao_client)
+    result = await service.search_places(
+        q="흑돼지", x=None, y=None, radius=None, rect=None, category=None
+    )
+
+    fetch_mock.assert_not_awaited()
+    assert result.places[0].thumbnail_url == sample_place.thumbnail_url
+    assert service.last_cache_stats == {"hit": 1, "miss": 0}
+
+
+async def test_search_places_fetches_og_image_when_not_cached(
+    mock_place_repo, mock_kakao_client, sample_kakao_place_raw, monkeypatch
+):
+    mock_kakao_client.search_by_keyword.return_value = [sample_kakao_place_raw]
+    mock_place_repo.get_by_ids.return_value = []  # 캐시 없음
+    fetch_mock = AsyncMock(return_value="https://example.com/thumb.jpg")
+    monkeypatch.setattr("app.services.place_service.fetch_og_image", fetch_mock)
+
+    service = PlaceService(mock_place_repo, mock_kakao_client)
+    result = await service.search_places(
+        q="흑돼지", x=None, y=None, radius=None, rect=None, category=None
+    )
+
+    fetch_mock.assert_awaited_once_with(sample_kakao_place_raw.place_url)
+    assert result.places[0].thumbnail_url == "https://example.com/thumb.jpg"
+    assert service.last_cache_stats == {"hit": 0, "miss": 1}

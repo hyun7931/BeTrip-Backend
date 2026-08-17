@@ -23,6 +23,8 @@ class PlaceService:
         # search_places 마지막 호출의 단계별 소요시간(ms).
         # 엔드포인트에서 Server-Timing 응답 헤더로 사용한다.
         self.last_timing: dict[str, float] = {}
+        # 마지막 호출에서 캐시 스킵으로 og fetch를 건너뛴/실제로 호출한 건수.
+        self.last_cache_stats: dict[str, int] = {}
 
     async def get_place_detail(self, place_id: str) -> PlaceDetailResponse:
         """
@@ -79,14 +81,38 @@ class PlaceService:
             )
         kakao_ms = (time.perf_counter() - t0) * 1000
 
-        # 2단계: og:image 썸네일 병렬 fetch
-        t1 = time.perf_counter()
-        thumbnails = await asyncio.gather(
-            *(fetch_og_image(place.place_url) for place in raw_places)
+        # 2단계: 캐시 스킵 — 이미 썸네일이 캐시된 place는 og fetch 대상에서 제외
+        t_cache = time.perf_counter()
+        cached_places = await self.repo.get_by_ids(
+            [place.place_id for place in raw_places]
         )
-        og_fetch_ms = (time.perf_counter() - t1) * 1000
+        cached_thumbnails = {
+            place.place_id: place.thumbnail_url
+            for place in cached_places
+            if place.thumbnail_url
+        }
+        cache_lookup_ms = (time.perf_counter() - t_cache) * 1000
 
-        # 3단계: places 테이블 upsert 캐싱
+        # 3단계: 캐시 미스인 place만 og:image 썸네일 병렬 fetch
+        t1 = time.perf_counter()
+        to_fetch = [
+            place for place in raw_places if place.place_id not in cached_thumbnails
+        ]
+        fetched = await asyncio.gather(
+            *(fetch_og_image(place.place_url) for place in to_fetch)
+        )
+        fetched_thumbnails = dict(
+            zip((place.place_id for place in to_fetch), fetched, strict=True)
+        )
+        thumbnails = [
+            cached_thumbnails.get(place.place_id)
+            or fetched_thumbnails.get(place.place_id)
+            for place in raw_places
+        ]
+        og_fetch_ms = (time.perf_counter() - t1) * 1000
+        self.last_cache_stats = {"hit": len(cached_thumbnails), "miss": len(to_fetch)}
+
+        # 4단계: places 테이블 upsert 캐싱
         t2 = time.perf_counter()
         await self.repo.upsert_many(
             [
@@ -107,6 +133,7 @@ class PlaceService:
 
         self.last_timing = {
             "kakao": kakao_ms,
+            "cache_lookup": cache_lookup_ms,
             "og_fetch": og_fetch_ms,
             "upsert": upsert_ms,
         }
