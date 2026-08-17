@@ -10,8 +10,10 @@ from tests.integration.itinerary.conftest import create_itinerary
 from tests.integration.map.conftest import create_place
 
 
-async def add_place_to_itinerary(db_session, itinerary_id, place_id) -> ItineraryPlace:
-    ip = ItineraryPlace(itinerary_id=itinerary_id, place_id=place_id)
+async def add_place_to_itinerary(
+    db_session, itinerary_id, place_id, **overrides
+) -> ItineraryPlace:
+    ip = ItineraryPlace(itinerary_id=itinerary_id, place_id=place_id, **overrides)
     db_session.add(ip)
     await db_session.commit()
     await db_session.refresh(ip)
@@ -231,3 +233,245 @@ class TestSavePlanAPI:
         )
 
         assert response.status_code == 401
+
+    async def test_save_with_items_persists_schedule(
+        self, client, db_session, signed_up_user
+    ):
+        access_token, user_id = signed_up_user
+        itinerary = await create_itinerary(db_session, user_id, status="GENERATED")
+        place_a = await create_place(db_session, place_id="save-a")
+        place_b = await create_place(db_session, place_id="save-b")
+        ip_a = await add_place_to_itinerary(
+            db_session, itinerary.itinerary_id, place_a.place_id
+        )
+        ip_b = await add_place_to_itinerary(
+            db_session, itinerary.itinerary_id, place_b.place_id
+        )
+
+        response = await client.post(
+            f"/api/v1/itineraries/{itinerary.itinerary_id}/plans/save",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "items": [
+                    {
+                        "itinerary_place_id": str(ip_a.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "MORNING",
+                        "order_in_day": 1,
+                        "travel_time_to_next_min": 15,
+                        "start_time": "09:00",
+                    },
+                    {
+                        "itinerary_place_id": str(ip_b.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "LUNCH",
+                        "order_in_day": 1,
+                        "start_time": "12:00",
+                    },
+                ]
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "SAVED"
+
+        await db_session.refresh(ip_a)
+        await db_session.refresh(ip_b)
+        assert ip_a.day == 1
+        assert ip_a.time_slot == "MORNING"
+        assert ip_a.order_in_day == 1
+        assert ip_a.travel_time_to_next_min == 15
+        assert ip_a.start_time == "09:00"
+        assert ip_b.time_slot == "LUNCH"
+        assert ip_b.travel_time_to_next_min is None
+
+    async def test_save_with_items_swaps_order_without_unique_violation(
+        self, client, db_session, signed_up_user
+    ):
+        """두 항목이 서로 order_in_day를 맞바꾸는 경우 2단계 업데이트로
+        uq_itinerary_places_slot 유니크 제약 위반 없이 성공해야 한다."""
+        access_token, user_id = signed_up_user
+        itinerary = await create_itinerary(db_session, user_id, status="GENERATED")
+        place_a = await create_place(db_session, place_id="swap-a")
+        place_b = await create_place(db_session, place_id="swap-b")
+        ip_a = await add_place_to_itinerary(
+            db_session,
+            itinerary.itinerary_id,
+            place_a.place_id,
+            day=1,
+            time_slot="MORNING",
+            order_in_day=1,
+        )
+        ip_b = await add_place_to_itinerary(
+            db_session,
+            itinerary.itinerary_id,
+            place_b.place_id,
+            day=1,
+            time_slot="MORNING",
+            order_in_day=2,
+        )
+
+        response = await client.post(
+            f"/api/v1/itineraries/{itinerary.itinerary_id}/plans/save",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "items": [
+                    {
+                        "itinerary_place_id": str(ip_a.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "MORNING",
+                        "order_in_day": 2,
+                    },
+                    {
+                        "itinerary_place_id": str(ip_b.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "MORNING",
+                        "order_in_day": 1,
+                    },
+                ]
+            },
+        )
+
+        assert response.status_code == 200
+        await db_session.refresh(ip_a)
+        await db_session.refresh(ip_b)
+        assert ip_a.order_in_day == 2
+        assert ip_b.order_in_day == 1
+
+    async def test_save_with_foreign_itinerary_place_id_returns_404(
+        self, client, db_session, signed_up_user
+    ):
+        access_token, user_id = signed_up_user
+        itinerary = await create_itinerary(db_session, user_id, status="GENERATED")
+        other_itinerary = await create_itinerary(
+            db_session, user_id, status="GENERATED"
+        )
+        place = await create_place(db_session, place_id="foreign-a")
+        foreign_ip = await add_place_to_itinerary(
+            db_session, other_itinerary.itinerary_id, place.place_id
+        )
+
+        response = await client.post(
+            f"/api/v1/itineraries/{itinerary.itinerary_id}/plans/save",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "items": [
+                    {
+                        "itinerary_place_id": str(foreign_ip.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "MORNING",
+                        "order_in_day": 1,
+                    }
+                ]
+            },
+        )
+
+        assert response.status_code == 404
+
+    async def test_save_with_duplicate_itinerary_place_id_returns_422(
+        self, client, db_session, signed_up_user
+    ):
+        access_token, user_id = signed_up_user
+        itinerary = await create_itinerary(db_session, user_id, status="GENERATED")
+        place = await create_place(db_session, place_id="dup-a")
+        ip = await add_place_to_itinerary(
+            db_session, itinerary.itinerary_id, place.place_id
+        )
+
+        response = await client.post(
+            f"/api/v1/itineraries/{itinerary.itinerary_id}/plans/save",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "items": [
+                    {
+                        "itinerary_place_id": str(ip.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "MORNING",
+                        "order_in_day": 1,
+                    },
+                    {
+                        "itinerary_place_id": str(ip.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "LUNCH",
+                        "order_in_day": 1,
+                    },
+                ]
+            },
+        )
+
+        assert response.status_code == 422
+
+    async def test_save_with_duplicate_slot_returns_422(
+        self, client, db_session, signed_up_user
+    ):
+        access_token, user_id = signed_up_user
+        itinerary = await create_itinerary(db_session, user_id, status="GENERATED")
+        place_a = await create_place(db_session, place_id="dupslot-a")
+        place_b = await create_place(db_session, place_id="dupslot-b")
+        ip_a = await add_place_to_itinerary(
+            db_session, itinerary.itinerary_id, place_a.place_id
+        )
+        ip_b = await add_place_to_itinerary(
+            db_session, itinerary.itinerary_id, place_b.place_id
+        )
+
+        response = await client.post(
+            f"/api/v1/itineraries/{itinerary.itinerary_id}/plans/save",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "items": [
+                    {
+                        "itinerary_place_id": str(ip_a.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "MORNING",
+                        "order_in_day": 1,
+                    },
+                    {
+                        "itinerary_place_id": str(ip_b.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "MORNING",
+                        "order_in_day": 1,
+                    },
+                ]
+            },
+        )
+
+        assert response.status_code == 422
+
+    async def test_save_already_saved_with_items_advances_saved_at(
+        self, client, db_session, signed_up_user
+    ):
+        access_token, user_id = signed_up_user
+        itinerary = await create_itinerary(db_session, user_id, status="SAVED")
+        place = await create_place(db_session, place_id="resave-a")
+        ip = await add_place_to_itinerary(
+            db_session,
+            itinerary.itinerary_id,
+            place.place_id,
+            day=1,
+            time_slot="MORNING",
+            order_in_day=1,
+        )
+        original_saved_at = itinerary.updated_at
+
+        response = await client.post(
+            f"/api/v1/itineraries/{itinerary.itinerary_id}/plans/save",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={
+                "items": [
+                    {
+                        "itinerary_place_id": str(ip.itinerary_place_id),
+                        "day": 1,
+                        "time_slot": "LUNCH",
+                        "order_in_day": 1,
+                    }
+                ]
+            },
+        )
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "SAVED"
+        assert body["saved_at"] != original_saved_at.isoformat()
+        await db_session.refresh(ip)
+        assert ip.time_slot == "LUNCH"

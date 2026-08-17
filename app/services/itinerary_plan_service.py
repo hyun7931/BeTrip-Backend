@@ -1,4 +1,5 @@
 from datetime import timedelta
+from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -7,13 +8,14 @@ from app.core.kakao_client import KakaoMapClient, KakaoMobilityClient
 from app.models.itinerary import Itinerary
 from app.models.itinerary_place import ItineraryPlace
 from app.models.place import Place
+from app.repositories.itinerary_plan_repository import ItineraryPlanRepository
 from app.repositories.itinerary_repository import ItineraryRepository
 from app.schemas.itinerary import (
     ScheduleDayResponse,
     ScheduleItemResponse,
     ScheduleResponse,
 )
-from app.schemas.plan import PlanGenerateResponse, PlanSaveResponse
+from app.schemas.plan import PlanGenerateResponse, PlanSaveItem, PlanSaveResponse
 from app.utils.itinerary_planner import (
     PlaceCoord,
     assign_time_slots,
@@ -29,10 +31,12 @@ class ItineraryPlanService:
         repo: ItineraryRepository,
         kakao_map_client: KakaoMapClient,
         kakao_mobility_client: KakaoMobilityClient,
+        plan_repo: ItineraryPlanRepository,
     ):
         self.repo = repo
         self.kakao_map_client = kakao_map_client
         self.kakao_mobility_client = kakao_mobility_client
+        self.plan_repo = plan_repo
 
     async def generate_plan(
         self, user_id: UUID, itinerary_id: UUID
@@ -114,7 +118,7 @@ class ItineraryPlanService:
                 )
             )
 
-        updated = await self.repo.apply_generated_schedule(
+        updated = await self.plan_repo.apply_generated_schedule(
             itinerary, "GENERATED", assignments
         )
 
@@ -124,7 +128,12 @@ class ItineraryPlanService:
             schedule=ScheduleResponse(days=schedule_days),
         )
 
-    async def save_plan(self, user_id: UUID, itinerary_id: UUID) -> PlanSaveResponse:
+    async def save_plan(
+        self,
+        user_id: UUID,
+        itinerary_id: UUID,
+        items: Optional[list[PlanSaveItem]] = None,
+    ) -> PlanSaveResponse:
         itinerary = await self._get_owned_itinerary(user_id, itinerary_id)
 
         if itinerary.status == "DRAFT":
@@ -133,8 +142,23 @@ class ItineraryPlanService:
                 detail="먼저 일정을 생성해주세요.",
             )
 
+        if items:
+            requested_ids = {item.itinerary_place_id for item in items}
+            existing = await self.plan_repo.find_itinerary_places_by_ids(
+                itinerary_id, requested_ids
+            )
+            existing_ids = {place.itinerary_place_id for place in existing}
+            if existing_ids != requested_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="이 일정에 속하지 않는 담긴 장소가 포함되어 있습니다.",
+                )
+            await self.plan_repo.bulk_update_schedule(items)
+
         if itinerary.status == "GENERATED":
-            itinerary = await self.repo.mark_saved(itinerary)
+            itinerary = await self.plan_repo.mark_saved(itinerary)
+        elif items:
+            itinerary = await self.plan_repo.touch(itinerary)
 
         return PlanSaveResponse(
             itinerary_id=itinerary.itinerary_id,
