@@ -47,6 +47,7 @@ class PlaceService:
         radius: int | None,
         rect: str | None,
         category: PlaceCategory | None,
+        page: int = 1,
     ) -> PlaceSearchResponse:
         category_group_code = (
             map_to_kakao_category_group_code(category) if category else None
@@ -55,8 +56,9 @@ class PlaceService:
         # 1단계: 카카오 검색 (키워드 or 카테고리)
         t0 = time.perf_counter()
         if q:
-            raw_places = await self.kakao_client.search_by_keyword(
+            search_result = await self.kakao_client.search_by_keyword(
                 q,
+                page=page,
                 x=x,
                 y=y,
                 radius=radius,
@@ -71,14 +73,16 @@ class PlaceService:
                     status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="위치 정보(x/y/radius 또는 rect)가 필요합니다",
                 )
-            raw_places = await self.kakao_client.search_by_category(
-                category_group_code, x=x, y=y, radius=radius, rect=rect
+            search_result = await self.kakao_client.search_by_category(
+                category_group_code, x=x, y=y, radius=radius, rect=rect, page=page
             )
         else:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="q 또는 category 중 하나는 필요합니다.",
             )
+        raw_places = search_result.places
+        has_next = not search_result.is_end
         kakao_ms = (time.perf_counter() - t0) * 1000
 
         # 2단계: 캐시 스킵 — 이미 썸네일이 캐시된 place는 og fetch 대상에서 제외
@@ -150,5 +154,6 @@ class PlaceService:
                     thumbnail_url=thumbnail,
                 )
                 for place, thumbnail in zip(raw_places, thumbnails, strict=True)
-            ]
+            ],
+            has_next=has_next,
         )

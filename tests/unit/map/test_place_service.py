@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
-from app.schemas.place import PlaceDetailResponse
+from app.schemas.place import KakaoSearchResult, PlaceDetailResponse
 from app.services.place_service import PlaceService
 
 
@@ -38,7 +38,9 @@ async def test_get_place_detail_raises_404_when_not_cached(
 async def test_search_places_with_keyword_upserts_and_returns_result(
     mock_place_repo, mock_kakao_client, sample_kakao_place_raw, monkeypatch
 ):
-    mock_kakao_client.search_by_keyword.return_value = [sample_kakao_place_raw]
+    mock_kakao_client.search_by_keyword.return_value = KakaoSearchResult(
+        places=[sample_kakao_place_raw], is_end=True
+    )
     monkeypatch.setattr(
         "app.services.place_service.fetch_og_image",
         AsyncMock(return_value="https://example.com/thumb.jpg"),
@@ -52,8 +54,37 @@ async def test_search_places_with_keyword_upserts_and_returns_result(
     assert len(result.places) == 1
     assert result.places[0].place_id == "123"
     assert result.places[0].thumbnail_url == "https://example.com/thumb.jpg"
+    assert result.has_next is False
     mock_kakao_client.search_by_keyword.assert_awaited_once()
     mock_place_repo.upsert_many.assert_awaited_once()
+
+
+async def test_search_places_passes_page_and_reflects_has_next(
+    mock_place_repo, mock_kakao_client, sample_kakao_place_raw, monkeypatch
+):
+    mock_kakao_client.search_by_keyword.return_value = KakaoSearchResult(
+        places=[sample_kakao_place_raw], is_end=False
+    )
+    monkeypatch.setattr(
+        "app.services.place_service.fetch_og_image",
+        AsyncMock(return_value=None),
+    )
+
+    service = PlaceService(mock_place_repo, mock_kakao_client)
+    result = await service.search_places(
+        q="흑돼지", x=None, y=None, radius=None, rect=None, category=None, page=2
+    )
+
+    assert result.has_next is True
+    mock_kakao_client.search_by_keyword.assert_awaited_once_with(
+        "흑돼지",
+        page=2,
+        x=None,
+        y=None,
+        radius=None,
+        rect=None,
+        category_group_code=None,
+    )
 
 
 async def test_search_places_category_only_requires_location(
@@ -90,7 +121,9 @@ async def test_search_places_skips_og_fetch_for_already_cached_place(
     sample_kakao_place_raw,
     monkeypatch,
 ):
-    mock_kakao_client.search_by_keyword.return_value = [sample_kakao_place_raw]
+    mock_kakao_client.search_by_keyword.return_value = KakaoSearchResult(
+        places=[sample_kakao_place_raw], is_end=True
+    )
     mock_place_repo.get_by_ids.return_value = [sample_place]  # thumbnail_url 캐시됨
     fetch_mock = AsyncMock()
     monkeypatch.setattr("app.services.place_service.fetch_og_image", fetch_mock)
@@ -108,7 +141,9 @@ async def test_search_places_skips_og_fetch_for_already_cached_place(
 async def test_search_places_fetches_og_image_when_not_cached(
     mock_place_repo, mock_kakao_client, sample_kakao_place_raw, monkeypatch
 ):
-    mock_kakao_client.search_by_keyword.return_value = [sample_kakao_place_raw]
+    mock_kakao_client.search_by_keyword.return_value = KakaoSearchResult(
+        places=[sample_kakao_place_raw], is_end=True
+    )
     mock_place_repo.get_by_ids.return_value = []  # 캐시 없음
     fetch_mock = AsyncMock(return_value="https://example.com/thumb.jpg")
     monkeypatch.setattr("app.services.place_service.fetch_og_image", fetch_mock)
