@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from fastapi import HTTPException, status
 
@@ -18,6 +19,10 @@ class PlaceService:
     def __init__(self, repo: PlaceRepository, kakao_client: KakaoMapClient):
         self.repo = repo
         self.kakao_client = kakao_client
+        # 개발용
+        # search_places 마지막 호출의 단계별 소요시간(ms).
+        # 엔드포인트에서 Server-Timing 응답 헤더로 사용한다.
+        self.last_timing: dict[str, float] = {}
 
     async def get_place_detail(self, place_id: str) -> PlaceDetailResponse:
         """
@@ -45,6 +50,8 @@ class PlaceService:
             map_to_kakao_category_group_code(category) if category else None
         )
 
+        # 1단계: 카카오 검색 (키워드 or 카테고리)
+        t0 = time.perf_counter()
         if q:
             raw_places = await self.kakao_client.search_by_keyword(
                 q,
@@ -70,11 +77,17 @@ class PlaceService:
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="q 또는 category 중 하나는 필요합니다.",
             )
+        kakao_ms = (time.perf_counter() - t0) * 1000
 
+        # 2단계: og:image 썸네일 병렬 fetch
+        t1 = time.perf_counter()
         thumbnails = await asyncio.gather(
             *(fetch_og_image(place.place_url) for place in raw_places)
         )
+        og_fetch_ms = (time.perf_counter() - t1) * 1000
 
+        # 3단계: places 테이블 upsert 캐싱
+        t2 = time.perf_counter()
         await self.repo.upsert_many(
             [
                 {
@@ -90,6 +103,13 @@ class PlaceService:
                 for place, thumbnail in zip(raw_places, thumbnails, strict=True)
             ]
         )
+        upsert_ms = (time.perf_counter() - t2) * 1000
+
+        self.last_timing = {
+            "kakao": kakao_ms,
+            "og_fetch": og_fetch_ms,
+            "upsert": upsert_ms,
+        }
 
         return PlaceSearchResponse(
             places=[

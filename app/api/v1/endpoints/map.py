@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.kakao_client import KakaoMapClient, KakaoMobilityClient
@@ -8,6 +8,7 @@ from app.schemas.place import PlaceCategory, PlaceDetailResponse, PlaceSearchRes
 from app.schemas.transit import TransitMode, TransitResponse
 from app.services.place_service import PlaceService
 from app.services.transit_service import TransitService
+from app.utils.server_timing import format_server_timing
 
 router = APIRouter(prefix="/map", tags=["map"])
 
@@ -47,6 +48,7 @@ async def get_place_detail(
     ),
 )
 async def search_places(
+    response: Response,
     q: str | None = Query(
         default=None, description="검색 키워드 (q 또는 category 필수)"
     ),
@@ -62,7 +64,12 @@ async def search_places(
     ),
     service: PlaceService = Depends(get_place_service),
 ):
-    return await service.search_places(q, x, y, radius, rect, category)
+    result = await service.search_places(q, x, y, radius, rect, category)
+    # 개발용
+    # fetch/upsert 단계별 소요시간을 바로 볼 수 있게 표준 Server-Timing 헤더로 노출
+    if service.last_timing:
+        response.headers["Server-Timing"] = format_server_timing(service.last_timing)
+    return result
 
 
 @router.get("/transit", response_model=TransitResponse, summary="Calculate Travel Time")
