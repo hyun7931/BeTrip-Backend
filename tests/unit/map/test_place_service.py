@@ -101,6 +101,28 @@ async def test_search_places_category_only_requires_location(
     mock_kakao_client.search_by_category.assert_not_awaited()
 
 
+async def test_search_places_category_with_location_returns_result(
+    mock_place_repo, mock_kakao_client, sample_kakao_place_raw, monkeypatch
+):
+    mock_kakao_client.search_by_category.return_value = KakaoSearchResult(
+        places=[sample_kakao_place_raw], is_end=True
+    )
+    monkeypatch.setattr(
+        "app.services.place_service.fetch_og_image",
+        AsyncMock(return_value=None),
+    )
+
+    service = PlaceService(mock_place_repo, mock_kakao_client)
+    result = await service.search_places(
+        q=None, x=127.0, y=37.5, radius=500, rect=None, category="RESTAURANT"
+    )
+
+    assert len(result.places) == 1
+    mock_kakao_client.search_by_category.assert_awaited_once_with(
+        "FD6", x=127.0, y=37.5, radius=500, rect=None, page=1
+    )
+
+
 async def test_search_places_without_q_or_category_raises_422(
     mock_place_repo, mock_kakao_client
 ):
