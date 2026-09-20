@@ -10,5 +10,37 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     OPENAI_API_KEY: str
 
+    # --- Auth ---
+    JWT_SECRET_KEY: str
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    COOKIE_SECURE: bool = True  # 로컬 .env에서는 COOKIE_SECURE=false
+
+    # --- API ---
+    API_V1_PREFIX: str = "/api/v1"
+
+    # --- CORS ---
+    CORS_ORIGINS: str = "http://localhost:5173"
+
+    # --- KAKAO ---
+    KAKAO_REST_API_KEY: str
+
+    # --- NAVER ---
+    NAVER_CLIENT_ID: str
+    NAVER_CLIENT_SECRET: str
+
+    # --- Gemini ---
+    GEMINI_API_KEY: str
+
+    # --- TourAPI ---
+    TOUR_API_KEY: str
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [
+            origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()
+        ]
+
 
 settings = Settings()
